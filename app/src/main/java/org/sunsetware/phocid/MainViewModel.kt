@@ -64,9 +64,8 @@ class MainViewModel(private val application: Application) : AndroidViewModel(app
     fun initialize() {
         if (!initializationStarted.getAndSet(true)) {
             viewModelScope.launch {
-                while (!GlobalData.initialized.get()) {
-                    delay(1)
-                }
+                // Use proper coroutine signaling instead of busy-wait polling
+                GlobalData.initializationComplete.await()
                 playerManager =
                     PlayerManager(GlobalData.playerState, GlobalData.playerTransientState)
                 uiManager =
@@ -120,8 +119,9 @@ class MainViewModel(private val application: Application) : AndroidViewModel(app
                             ) { _, _ ->
                                 mediaScannerSignal.set(true)
                             }
+                            // Use longer delay interval to reduce CPU wake-ups and save battery
                             while (!mediaScannerSignal.get()) {
-                                delay(1)
+                                delay(10)
                             }
                         }
 
@@ -140,11 +140,12 @@ class MainViewModel(private val application: Application) : AndroidViewModel(app
                             }
                         if (newTrackIndex != null) {
                             GlobalData.unfilteredTrackIndex.update { newTrackIndex }
+                            // Use longer delay interval to reduce CPU wake-ups and save battery
                             while (
                                 GlobalData.libraryIndex.value.flowVersion <
                                     newTrackIndex.flowVersion
                             ) {
-                                delay(1)
+                                delay(10)
                             }
                             Log.d("Phocid", "Library scan completed")
                         } else {
@@ -156,8 +157,9 @@ class MainViewModel(private val application: Application) : AndroidViewModel(app
                         _libraryScanState.update { null }
                     }
                 } else {
-                    while (scanMutex.isLocked) {
-                        delay(1)
+                    // Wait for the mutex using withLock instead of busy polling
+                    scanMutex.withLock {
+                        // Mutex was released, we can proceed (but do nothing, just wait for scan)
                     }
                 }
             }

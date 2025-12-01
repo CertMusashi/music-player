@@ -102,6 +102,7 @@ class MainApplication : Application() {
                 }
 
                 initialized.set(true)
+                initializationComplete.complete(Unit)
             }
         }
     }

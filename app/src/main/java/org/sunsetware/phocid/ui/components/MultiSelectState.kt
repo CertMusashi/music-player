@@ -25,8 +25,11 @@ import org.sunsetware.phocid.utils.replace
 data class Selectable<T>(val value: T, val selected: Boolean)
 
 @Immutable
-class SelectableList<T>(items: List<Selectable<T>>) : List<Selectable<T>> by items {
-    val selection = items.filter { it.selected }.map { it.value }
+class SelectableList<T>(private val items: List<Selectable<T>>) : List<Selectable<T>> by items {
+    /** Lazily computed selection list - only computed when accessed */
+    val selection: List<T> by lazy(LazyThreadSafetyMode.PUBLICATION) {
+        items.filter { it.selected }.map { it.value }
+    }
 }
 
 fun <T> List<Selectable<T>>.toSelectableList(): SelectableList<T> {

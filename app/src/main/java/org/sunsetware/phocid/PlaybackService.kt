@@ -76,8 +76,10 @@ class PlaybackService : MediaLibraryService() {
 
     override fun onCreate() {
         super.onCreate()
-        while (!GlobalData.initialized.get()) {
-            Thread.sleep(1)
+        // Use runBlocking with the CompletableDeferred for proper coroutine signaling
+        // instead of busy-wait polling with Thread.sleep
+        kotlinx.coroutines.runBlocking {
+            GlobalData.initializationComplete.await()
         }
 
         val player = CustomizedPlayer(this)
