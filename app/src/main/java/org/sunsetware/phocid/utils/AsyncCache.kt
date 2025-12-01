@@ -9,7 +9,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -68,16 +67,29 @@ class AsyncCache<TKey : Any, TValue : Any>(
         return creationJob.await()
     }
 
+    /**
+     * Non-blocking synchronous cache lookup. Returns cached value without blocking.
+     * Returns null if the cache is locked by another operation.
+     */
     fun get(key: TKey): TValue? {
-        return runBlocking {
-            mutex.withLock {
+        // Use tryLock to avoid blocking - if we can't get the lock, return null
+        // This is acceptable for a cache lookup as it's non-critical and callers
+        // can fall back to loading the value themselves
+        return if (mutex.tryLock()) {
+            try {
                 entries
                     .indexOfFirst { it.first == key }
                     .takeIf { it >= 0 }
                     ?.let { entries.removeAt(it) }
                     ?.apply { entries += this }
                     ?.second
+            } finally {
+                mutex.unlock()
             }
+        } else {
+            // If locked, return null to avoid race conditions
+            // The caller can load the value themselves if needed
+            null
         }
     }
 

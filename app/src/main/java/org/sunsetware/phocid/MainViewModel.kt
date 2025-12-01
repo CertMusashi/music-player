@@ -32,6 +32,7 @@ class MainViewModel(private val application: Application) : AndroidViewModel(app
     val initialized = _initialized.asStateFlow()
     private val initializationStarted = AtomicBoolean(false)
     private val scanMutex = Mutex()
+    private var currentScanJob: Job? = null
 
     lateinit var playerManager: PlayerManager
     lateinit var uiManager: UiManager
@@ -64,9 +65,8 @@ class MainViewModel(private val application: Application) : AndroidViewModel(app
     fun initialize() {
         if (!initializationStarted.getAndSet(true)) {
             viewModelScope.launch {
-                while (!GlobalData.initialized.get()) {
-                    delay(1)
-                }
+                // Use proper coroutine signaling instead of busy-wait polling
+                GlobalData.initializationComplete.await()
                 playerManager =
                     PlayerManager(GlobalData.playerState, GlobalData.playerTransientState)
                 uiManager =
@@ -91,7 +91,12 @@ class MainViewModel(private val application: Application) : AndroidViewModel(app
 
     @OptIn(ExperimentalSerializationApi::class)
     fun scanLibrary(force: Boolean): Job {
-        return viewModelScope.launch {
+        // If a scan is already in progress, return the existing job
+        currentScanJob?.let { job ->
+            if (job.isActive) return job
+        }
+
+        val job = viewModelScope.launch {
             withContext(Dispatchers.IO) {
                 if (scanMutex.tryLock()) {
                     Log.d("Phocid", "Library scan started")
@@ -120,8 +125,9 @@ class MainViewModel(private val application: Application) : AndroidViewModel(app
                             ) { _, _ ->
                                 mediaScannerSignal.set(true)
                             }
+                            // Use longer delay interval to reduce CPU wake-ups and save battery
                             while (!mediaScannerSignal.get()) {
-                                delay(1)
+                                delay(10)
                             }
                         }
 
@@ -140,11 +146,12 @@ class MainViewModel(private val application: Application) : AndroidViewModel(app
                             }
                         if (newTrackIndex != null) {
                             GlobalData.unfilteredTrackIndex.update { newTrackIndex }
+                            // Use longer delay interval to reduce CPU wake-ups and save battery
                             while (
                                 GlobalData.libraryIndex.value.flowVersion <
                                     newTrackIndex.flowVersion
                             ) {
-                                delay(1)
+                                delay(10)
                             }
                             Log.d("Phocid", "Library scan completed")
                         } else {
@@ -156,12 +163,13 @@ class MainViewModel(private val application: Application) : AndroidViewModel(app
                         _libraryScanState.update { null }
                     }
                 } else {
-                    while (scanMutex.isLocked) {
-                        delay(1)
-                    }
+                    // A scan is already in progress, wait for current job to complete
+                    currentScanJob?.join()
                 }
             }
         }
+        currentScanJob = job
+        return job
     }
 
     fun updatePreferences(transform: (Preferences) -> Preferences) {

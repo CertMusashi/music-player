@@ -14,9 +14,8 @@ import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionCommand
 import androidx.media3.session.SessionToken
-import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -51,19 +50,18 @@ class PlayerManager(
         val sessionToken =
             SessionToken(context, ComponentName(context, PlaybackService::class.java))
         val controllerFuture = MediaController.Builder(context, sessionToken).buildAsync()
-        val completed = AtomicBoolean(false)
+        // Use CompletableDeferred for proper coroutine signaling instead of busy-wait polling
+        val completed = CompletableDeferred<Unit>()
         controllerFuture.addListener(
             {
                 mediaController = controllerFuture.get()
                 mediaController.prepare()
-                completed.set(true)
+                completed.complete(Unit)
             },
             ContextCompat.getMainExecutor(context),
         )
 
-        while (!completed.get()) {
-            delay(1)
-        }
+        completed.await()
     }
 
     private fun updateTransientState() {
