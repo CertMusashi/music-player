@@ -69,11 +69,12 @@ class AsyncCache<TKey : Any, TValue : Any>(
 
     /**
      * Non-blocking synchronous cache lookup. Returns cached value without blocking.
-     * Does not update LRU ordering to avoid blocking on mutex.
+     * Returns null if the cache is locked by another operation.
      */
     fun get(key: TKey): TValue? {
-        // Use tryLock to avoid blocking - if we can't get the lock, just return null
-        // This is acceptable for a cache lookup as it's non-critical
+        // Use tryLock to avoid blocking - if we can't get the lock, return null
+        // This is acceptable for a cache lookup as it's non-critical and callers
+        // can fall back to loading the value themselves
         return if (mutex.tryLock()) {
             try {
                 entries
@@ -86,8 +87,9 @@ class AsyncCache<TKey : Any, TValue : Any>(
                 mutex.unlock()
             }
         } else {
-            // If locked, do a simple lookup without LRU update
-            entries.firstOrNull { it.first == key }?.second
+            // If locked, return null to avoid race conditions
+            // The caller can load the value themselves if needed
+            null
         }
     }
 

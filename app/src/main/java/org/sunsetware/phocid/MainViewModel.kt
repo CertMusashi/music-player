@@ -32,6 +32,7 @@ class MainViewModel(private val application: Application) : AndroidViewModel(app
     val initialized = _initialized.asStateFlow()
     private val initializationStarted = AtomicBoolean(false)
     private val scanMutex = Mutex()
+    private var currentScanJob: Job? = null
 
     lateinit var playerManager: PlayerManager
     lateinit var uiManager: UiManager
@@ -90,7 +91,12 @@ class MainViewModel(private val application: Application) : AndroidViewModel(app
 
     @OptIn(ExperimentalSerializationApi::class)
     fun scanLibrary(force: Boolean): Job {
-        return viewModelScope.launch {
+        // If a scan is already in progress, return the existing job
+        currentScanJob?.let { job ->
+            if (job.isActive) return job
+        }
+
+        val job = viewModelScope.launch {
             withContext(Dispatchers.IO) {
                 if (scanMutex.tryLock()) {
                     Log.d("Phocid", "Library scan started")
@@ -157,13 +163,13 @@ class MainViewModel(private val application: Application) : AndroidViewModel(app
                         _libraryScanState.update { null }
                     }
                 } else {
-                    // Wait for the mutex using withLock instead of busy polling
-                    scanMutex.withLock {
-                        // Mutex was released, we can proceed (but do nothing, just wait for scan)
-                    }
+                    // A scan is already in progress, wait for current job to complete
+                    currentScanJob?.join()
                 }
             }
         }
+        currentScanJob = job
+        return job
     }
 
     fun updatePreferences(transform: (Preferences) -> Preferences) {
