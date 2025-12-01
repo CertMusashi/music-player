@@ -20,11 +20,28 @@ A modern offline music player with familiar designs for Android 11+.
 
 This project aims to be a replacement with personal tweaks for the now-defunct https://github.com/kabouzeid/Phonograph[Phonograph] music player, but has no connections with it.
 
-== Help & FAQ
+---
 
-Please refer to https://sunsetware.org/phocid/help/[the help page on the website.]
+== Changes from Original Phocid
 
-If your problem is not covered by this page, you can create an https://github.com/TJYSunset/Phocid/issues[issue] or https://github.com/TJYSunset/Phocid/discussions[discussion] depending on the severity.
+This fork is based on https://github.com/TJYSunset/Phocid[Phocid] and includes the following enhancements:
+
+=== New Features
+
+* **Tag Editing**: Edit music file metadata directly in the app (title, artist, album, album artist, genre, year, track number, disc number, comment, and lyrics) with support for MP3, FLAC, OGG, M4A, MP4, WMA, WAV, AIF, AIFF, and DSF formats
+* **File Deletion**: Delete music files directly from the app with proper Android 11+ permission handling
+
+=== Performance Improvements
+
+* **Optimized Battery Usage**: Replaced busy-wait polling loops with proper coroutine signaling to reduce CPU wake-ups
+* **Reduced RAM Consumption**: Removed unnecessary large heap allocation and implemented lazy loading for better memory efficiency
+* **Improved Responsiveness**: Non-blocking operations and optimized scan intervals for smoother user experience
+
+=== UI/UX Enhancements
+
+* **App Rebranded**: Application name changed from "Phocid" to "Music"
+
+---
 
 == Features
 
